@@ -39,26 +39,30 @@ objectives:
 
 ## Conclusion
 
-# Demo
+# Lab
 
-Today we're building the Mint-A-Day app, where users will able to mint a single snapshot of their lives daily, creating a permanent diary of sorts.
+Today we're building the Mint-A-Day app, where users will able to mint a single NFT snapshot of their lives daily, creating a permanent diary of sorts.
 
-We will be building this with React Native and Expo. Expo is a set of tools built around React Native that will make our lives easier when dealing with device related packages, like using the camera. To mint the NFTs we will be using Metaplex's javascript sdk and we will be using [nft.storage](https://nft.storage/) to store our images and metadata. Everything will be on Devnet.
+We will be building this with React Native and Expo. Expo is a set of tools built around React Native that will make our lives easier when dealing with device-related packages, like using the camera. To mint the NFTs we will be using Metaplex's Javascript SDK along with [nft.storage](https://nft.storage/) to store images and metadata. All of our on-chain work will be on Devnet.
 
 
 ### 1. Prerequisites
-In this lesson we are building off of the previous two, meaning we'll need to have a React Native Dev environment complete with an emulator (or physical device), as well as a working devnet wallet installed. If you've completed the previous two lessons, feel free to skip steps one and two below.
+This lab builds off the previous two mobile lessons. This means we'll need the following:
+1. A working React Native dev environment complete with an emulator (or physical device)
+2. A working wallet connected to Devnet installed on your emulator
 
-1. **Setup React Dev Environment** 
+If you've completed the previous two lessons, feel free to skip steps one and two below.
 
-You'll need react native installed on your machine as well as a running emulator or physical device. [You can accomplish this all with the React Native quickstart](https://reactnative.dev/docs/environment-setup?guide=native). 
+1. **Set Up React Dev Environment** 
+
+You'll need React Native installed on your machine as well as a running emulator or physical device. [You can accomplish this all with the React Native quickstart](https://reactnative.dev/docs/environment-setup?guide=native). 
 
 >Note: Even though we are using Expo, you'll need to follow the react native cli guide.
 >Note: If you are running an emulator, it is highly recommend to use a newer phone version to emulate along with providing several GB of RAM for it to run. We use 5GB of ram on our side. 
 
 2. **Download and Install Solana Wallet**
 
-You'll need a wallet that supports devnet to test with. In [lesson 2](./TODO) we created one of these, let's install it from the solution branch.
+You'll need a wallet that supports Devnet to test with. In [lesson 2](./TODO) we created one of these, let's install it from the solution branch.
 
 ```bash
 git clone https://github.com/Unboxed-Software/react-native-fake-solana-wallet
@@ -72,9 +76,10 @@ The wallet should be installed on your emulator or device. Make sure to open the
 
 3. **Sign up for EAS account and install the CLI**
   
-We are using Expo, which you'll want an [EAS account for](https://expo.dev/). Their services help you build the application and run it anywhere. 
+We are using Expo. To simplify the process, you'll want an [Expo Application Services (EAS) account](https://expo.dev/). This will help you build and run the application anywhere. 
 
-Now, install the `eas-cli` and login:
+Now, install the `eas-cli` and log in:
+
 ```bash
 npm install --global eas-cli
 eas login
@@ -82,11 +87,13 @@ eas login
 
 4. **Sign up for NFT.Storage API**
 
-We are using NFT.storage to host our NFTs since they do this for free. [Sign up, and create yourself an API key](https://nft.storage/manage/). Keep this api key private, we will put this into an `.env` file later.
+We'll be using NFT.storage to host our NFTs with IPFS since they do this for free. [Sign up, and create yourself an API key](https://nft.storage/manage/). Keep this API key private. We'll put this into an `.env` file later.
 
-### 2. Create the App
+### 2. Create the App scaffold
 
-We are using Expo, however, since the `@solana-mobile/mobile-wallet-adapter-protocol` package we will use includes native code, we cannot build and [run Expo normally](https://docs.solanamobile.com/react-native/expo#running-the-app). We’ll need to build it first, and then run our development client. You can do this locally, or use an Expo account to have them build it for you. We are going to build this locally, if you want expo to build it [follow the Solana Mobile’s guide](https://docs.solanamobile.com/react-native/expo#local-vs-eas-builds).
+We'll be using Expo to build and run our app. However, since the `@solana-mobile/mobile-wallet-adapter-protocol` package includes native code, we need to make some minor modifications. We'll be using the [method described in the Solana mobile docs](https://docs.solanamobile.com/react-native/expo#running-the-app).
+
+We’ll first build the app, and then separately run our development client. You can do this locally or use an Expo account to have them build it for you. We will be using the local option. Feel free to [follow Solana Mobile’s guide](https://docs.solanamobile.com/react-native/expo#local-vs-eas-builds) if you want to have Expo build the app for you.
 
 Let’s create our app with the following:
 `npx create-expo-app -t expo-template-blank-typescript solana-expo`
@@ -95,9 +102,9 @@ Then let’s make sure everything is setup properly by starting the default app 
 
 `cd solana-expo` 
 
-### 3. Install Dependancies
+### 3. Install Dependencies
 
-We’ll need to add in our Solana dependancies. Fortunately [Solana Mobile gives](https://docs.solanamobile.com/react-native/expo) us a really nice list of what packages we need and why we need them: 
+We’ll need to add in our Solana dependencies. Fortunately [Solana Mobile gives](https://docs.solanamobile.com/react-native/expo) us a really nice list of what packages we need and why we need them: 
 
 - `@solana-mobile/mobile-wallet-adapter-protocol`: A React Native/Javascript API enabling interaction with MWA-compatible wallets.
 - `@solana-mobile/mobile-wallet-adapter-protocol-web3js`: A convenience wrapper to use common primitives from [@solana/web3.js](https://github.com/solana-labs/solana-web3.js) – such as `Transaction` and `Uint8Array`.
