@@ -53,7 +53,7 @@ This lab builds off the previous two mobile lessons. This means we'll need the f
 
 If you've completed the previous two lessons, feel free to skip steps one and two below.
 
-1. **Set Up React Dev Environment** 
+1. **Set Up React Native Dev Environment** 
 
 You'll need React Native installed on your machine as well as a running emulator or physical device. [You can accomplish this all with the React Native quickstart](https://reactnative.dev/docs/environment-setup?guide=native). 
 
@@ -85,39 +85,52 @@ npm install --global eas-cli
 eas login
 ```
 
-4. **Sign up for NFT.Storage API**
+4. **Get an NFT.Storage API key**
 
-We'll be using NFT.storage to host our NFTs with IPFS since they do this for free. [Sign up, and create yourself an API key](https://nft.storage/manage/). Keep this API key private. We'll put this into an `.env` file later.
+We'll be using NFT.storage to host our NFTs with IPFS since they do this for free. [Sign up, and create an API key](https://nft.storage/manage/). Keep this API key private. We'll put this into a `.env` file later.
 
-### 2. Create the App scaffold
+### 2. Create the app scaffold
 
-We'll be using Expo to build and run our app. However, since the `@solana-mobile/mobile-wallet-adapter-protocol` package includes native code, we need to make some minor modifications. We'll be using the [method described in the Solana mobile docs](https://docs.solanamobile.com/react-native/expo#running-the-app).
+We'll be using Expo to build and run our app. However, since the `@solana-mobile/mobile-wallet-adapter-protocol` package includes native code, we need to make some minor modifications to the traditional Expo build command. We'll be using the [method described in the Solana mobile docs](https://docs.solanamobile.com/react-native/expo#running-the-app).
 
 We’ll first build the app, and then separately run our development client. You can do this locally or use an Expo account to have them build it for you. We will be using the local option. Feel free to [follow Solana Mobile’s guide](https://docs.solanamobile.com/react-native/expo#local-vs-eas-builds) if you want to have Expo build the app for you.
 
 Let’s create our app with the following:
 `npx create-expo-app -t expo-template-blank-typescript solana-expo`
 
-Then let’s make sure everything is setup properly by starting the default app and running it on our android emulator.
+This uses `create-expo-app` to generate a new scaffold for us based on the `expo-template-blank-typescript` template. This is just an empty Typescript React Native app.
 
-`cd solana-expo` 
+### 3. Install dependencies
 
-### 3. Install Dependencies
+Before we build the app for the first time, let's set up our dependencies.We'll break this list into two: 
+1. Basic Solana dependencies that are likely to be needed by all Solana mobile apps
+2. Additional dependencies that are specific to our app
 
-We’ll need to add in our Solana dependencies. Fortunately [Solana Mobile gives](https://docs.solanamobile.com/react-native/expo) us a really nice list of what packages we need and why we need them: 
+Both of these lists will include polyfills that allow otherwise incompatible packages to work with React native. If you're not familiar with polyfills, take a look at the [MDN docs](https://developer.mozilla.org/en-US/docs/Glossary/Polyfill). In short, polyfills actively replace Node-native libraries to make them work anywhere Node is not running.
+
+Basic Solana dependencies include the following:
 
 - `@solana-mobile/mobile-wallet-adapter-protocol`: A React Native/Javascript API enabling interaction with MWA-compatible wallets.
 - `@solana-mobile/mobile-wallet-adapter-protocol-web3js`: A convenience wrapper to use common primitives from [@solana/web3.js](https://github.com/solana-labs/solana-web3.js) – such as `Transaction` and `Uint8Array`.
 - `@solana/web3.js`: Solana Web Library for interacting with Solana network through the [JSON RPC API](https://docs.solana.com/api/http).
 - `react-native-get-random-values`: Secure random number generator polyfill for `web3.js` underlying Crypto library on React Native.
-- `buffer`: Buffer polyfill also needed for `web3.js` on React Native.
+- `buffer`: Buffer polyfill needed for `web3.js` on React Native.
 
-We are also going to need several of our own:
-- Multiple Polyfills
-- `@metaplex-foundation/js`: Allows us to easily create and fetch NFTs
-- `rn-fetch-blob`: Helps turn device images to blobs we can upload to NFT.storage. 
+Additional dependencies include the following:
 
-Install everything:
+- `@metaplex-foundation/js`: Allows us to easily create and fetch NFTs. At the time of writing, you need to use version 0.19.x for everything to work properly.
+- Various polyfills that are needed to make the Metaplex package work, including:
+  - `assert`
+  - `util`
+  - `crypto-browserify`
+  - `stream-browserify`
+  - `readable-stream`
+  - `browserify-zlib`
+  - `path-browserify`
+  - `react-native-url-polyfill`
+- `rn-fetch-blob`: Helps turn device images to blobs we can upload to [NFT.storage](https://nft.storage). 
+
+Make sure you install all of the above. You can do this with the following command:
 ```bash
 npm install \
   @solana/web3.js \
@@ -137,16 +150,19 @@ npm install \
   rn-fetch-blob
 ```
 
-We will be adding the appropriate polyfills to a couple of files in a couple of steps. Polyfills actively replace node-native libraries to make them work anywhere Node is not running.
+We will finish setting up the polyfills in a later step. 
 
-### 4. Expo Dependancies
-One of Expo's super nicest features is allowing us to utilize the physical phone is a straightforward way with minimal setup. We're using expo's image picker api today, which will allow us to take a picture that we can then upload.
+### 4. Install Expo dependencies
 
-Install the dependency: 
+Before continuing, we need to install the Expo-specific dependencies we'll be using. One of the primary reasons we're using Expo is that it provides convenient interfaces for utilizing the phone's hardware. We'll be using Expo's image picker API. This lets us use the device's camera to take pictures that we'll subsequently turn into NFTs.
+
+Install the dependency now using the following command:
+
 ```bash
 npx expo install expo-image-picker
 ```
-Configure the new plugin in `app.json`:
+
+Next, configure the new plugin in `app.json`:
 ```json
   "expo": {
     // ....
@@ -162,36 +178,32 @@ Configure the new plugin in `app.json`:
   }
 ```
 
-***NOTE*** Every time you add in new dependancies you'll have to build and re-install the app. Anything visual or logic-based can be done in the hot-reloader. This is why we are installing and setting up all of our dependancies first.
+***NOTE*** Every time you add in new dependencies, you'll have to build and re-install the app. Anything visual or logic-based should be captured by the hot-reloader.
 
-### 5. Env Setup
-To use NFT.Storage we need to import our API key, this should always be kept in a `.env` file with `.env` added in your `.gitignore`. Keep your API keys safe, and never upload them to a public directory.
+### 5. Set up environment variables
 
-A common way to set this up is to create two files `.env` and `.env.example`
+To use NFT.Storage we need to import our API key. API keys should always be kept secure. Never upload them to a public directory.
 
-Create both files, in the root of your directory and add `.env` to your `.gitignore` file ( if it's not already there )
-```bash
-echo 'EXPO_PUBLIC_NFT_STORAGE_API=' | tee .env .env.example
-echo '.env' >> .gitignore
-```
+Best practices suggest keeping them in a `.env` file with `.env` added to your `.gitignore`. It's also a good idea to create a `.env.example` file that can be committed to your repo and shows what environment variables are needed for the project.
 
-Copy and paste your NFT.Storage API key only in the `.env` after the `EXPO_PUBLIC_NFT_STORAGE_API=` line. Now you'll be able to access your API key safely in the application. 
+Create both files, in the root of your directory and add `.env` to your `.gitignore` file.
 
-### 4. First Build
-Let's build the app.
+Then, add your API key to the `.env` file with the name `EXPO_PUBLIC_NFT_STORAGE_API`. Now you'll be able to access your API key safely in the application. 
 
-First we'll need to login if you did not already in the Prerequisites section:
+### 6. Final preparations and first build
+We're very close to being able to build.
+
+First, we'll need to log into EAS if you aren't already logged in:
 ```bash
 eas login
 ```
 
-
-Then create a file called `eas.json` in the root of your directory, with the following inside. This is needed setup to build locally.
+Then create a file called `eas.json` in the root of your directory. This file will contain instructions needed for building locally.
 ```bash
 touch eas.json
 ```
 
-Copy and paste into `eas.json`:
+Copy and paste the following into the newly created `eas.json`:
 ```json
 {
   "cli": {
@@ -213,12 +225,12 @@ Copy and paste into `eas.json`:
 }
 ```
 
-We also need to resolve our polyfills from before, we do that in a new file `metro.config.js`:
+Finally, we need to resolve our polyfills from before. We do that in a new file `metro.config.js`:
 ```bash
 touch metro.config.js
 ```
 
-Copy and paste the following in `metro.config.js`:
+Copy and paste the following into `metro.config.js`:
 ```js
 /**
  * Metro configuration for React Native
@@ -243,19 +255,18 @@ defaultConfig.resolver.extraNodeModules = {
 
 // Export the modified configuration
 module.exports = defaultConfig;
-
 ```
 
 
-Then build the project. You will choose `y` for every answer. This will take a while. When it is done, you will get an output of `build-XXXXXXXXXXX.apk`
+Then build the project. You will choose `y` for every answer. This will take a while to complete.
 
 ```bash
 npx eas build --profile development --platform android --local
 ```
 
-Take the resulting build file and ***drag it*** into your emulator.
+When it is done, you will get an output file at the root of your directory. This file will have a naming format of `build-XXXXXXXXXXX.apk`. Locate this file in your file explorer and ***drag it*** into your emulator. A message should show on the emulator saying that it is installing the new APK. When it finishes installing, you should see the APK as an app icon in the emulator.
 
-Finally run the following to build and deploy on your emulator:
+The app that was installed is just a scaffold app from Expo. The last thing you'll need to do is run the following command to build and deploy on your emulator:
 
 ```bash
 npx expo start --dev-client --android
@@ -263,7 +274,7 @@ npx expo start --dev-client --android
 
 This should open and run the app in your Android emulator. If you run into problems, check to make sure you’ve accomplished everything in the Prerequisites section.
 
-### 5. Solana Boilerplate
+### 7. Solana Boilerplate
 
 Create two new folders `components` and `screens`.
 
