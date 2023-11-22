@@ -1,22 +1,3 @@
-# Notes
-
-- Java version 11 (openjdk 11.0.20.1 2023-08-24)
-- https://developer.android.com/studio
-- if you’re running on a mac - you’ll need to run:
-    
-    ```bash
-    git clone https://github.com/Unboxed-Software/solana-mobile-counter.git
-    cd solana-mobile-counter
-    npm install
-    cd android/
-    chmod +x gradlew
-    cd ..
-    npm run android
-    ```
-    
-
-# Lesson
-
 ---
 title: Basic React Native
 objectives:
@@ -28,14 +9,80 @@ objectives:
 # TL;DR
 
 - …
-- ….
+- …
 - …
 
 # Overview
 
+Solana has a future in mobile; artwork, games and deFi are all on the horizon. However to get there, we'll need to integrate with the popular frameworks people use to create amazing apps. In the first and second lesson we used vanilla React Native. Today we are going to build atop by looking at [React Native Expo](https://docs.expo.dev/tutorial/introduction/). 
+
 ## React Native Expo
 
+Expo is an open source collection of tools and libraries that wrap around React Native, much like Create-React-App vs Next.js. 
+
+Expo contains three main parts: `expo-cli`, the Expo Go App, and great device libraries.
+
+The `expo-cli` is a build and debugging tool that helps make all of the magic happen. It mostly works under the hood, the only time you'll really have to interact with it is when you're building or starting a development server. It just works!
+
+The [Expo Go App](https://expo.dev/client) is a really cool piece of tech allowing *most* apps to be developed without using an emulator or wires. You download the app, you scan the QR from the build output and then you have a working dev environment right on your phone. Unfortunately, this will not work with the solana mobile SDK. Coming from the [Solana Expo setup article](https://docs.solanamobile.com/react-native/expo):
+
+>The traditional Expo Go development flow is only limited to certain hand-picked modules and does not support further customized native code, which Solana Mobile SDKs need.
+>Instead, we'll need to use a custom development build which makes Solana Mobile React Native libraries (i.e Mobile Wallet Adapter) fully compatible with Expo.
+
+Lastly, and most importantly, Expo does an amazing job providing easy to use libraries that give you access to the device. The camera, the battery, the speakers - there's an [SDK for that](https://docs.expo.dev/versions/latest/). The libraries are simple to use and the documentation is phenomenal.
+
 ## Integrating ecosystems  
+
+As mentioned in the previous section there are some caveats using the Solana Mobile SDK with Expo. This is largely due to how mobile wallet adapter works with it's need for low-level app-to-app communication. Fortunately to get them to play well with each other all we have to do is configure Expo with the correct polyfills.
+
+Polyfills are replacement core libraries for environments that are not running Node.js, which we don't do in Expo. Unfortunately, it can be tough to know which polyfills you need for any given application. Unless you know ahead of time, debugging polyfills is looking at the compiler errors along with searching stack overflow. If it doesn't build, it's normally a polyfill problem.
+
+Fortunately, we've compiled a list of polyfills you'll need for not only Expo + Solana, but also Solana + Metaplex + Solana.
+
+### Solana Polyfills
+
+For a solana + Expo app, you'll need the following:
+- `@solana-mobile/mobile-wallet-adapter-protocol`: A React Native/Javascript API enabling interaction with MWA-compatible wallets.
+- `@solana-mobile/mobile-wallet-adapter-protocol-web3js`: A convenience wrapper to use common primitives from [@solana/web3.js](https://github.com/solana-labs/solana-web3.js) – such as `Transaction` and `Uint8Array`.
+- `@solana/web3.js`: Solana Web Library for interacting with Solana network through the [JSON RPC API](https://docs.solana.com/api/http).
+- `react-native-get-random-values`: Secure random number generator polyfill for `web3.js` underlying Crypto library on React Native.
+- `buffer`: Buffer polyfill needed for `web3.js` on React Native.
+
+### Metaplex Polyfills
+
+If you want to use the Metaplex SDK, you'll need some additional:
+
+- `@metaplex-foundation/js@0.19.4` - Metaplex Library
+- Several more polyfills
+  - `assert`
+  - `util`
+  - `crypto-browserify`
+  - `stream-browserify`
+  - `readable-stream`
+  - `browserify-zlib`
+  - `path-browserify`
+  - `react-native-url-polyfill`
+
+Additionally, for Metaplex, you'll need to register the polyfills using a `metro.config.js`. Below is the config used in the Lab:
+
+```js
+const { getDefaultConfig } = require('@expo/metro-config');
+const defaultConfig = getDefaultConfig(__dirname);
+
+defaultConfig.resolver.extraNodeModules = {
+  crypto: require.resolve('crypto-browserify'),
+  stream: require.resolve('readable-stream'),
+  url: require.resolve('react-native-url-polyfill'),
+  zlib: require.resolve('browserify-zlib'),
+  path: require.resolve('path-browserify'),
+};
+
+module.exports = defaultConfig;
+```
+
+### Putting it all together
+
+The good news is that once you have the application compiling and running, there are very little differences between creating a web dApp and a mobile dApp.
 
 # Lab
 
@@ -584,6 +631,37 @@ The app itself is pretty simple the general flow is as following:
 
 ### 1. NFT Provider
 
+`NFTProvider.tsx` will control the state with our custom `NFTProviderContext` which contains the following fields:
+
+`metaplex?: Metaplex | null` - Holds the metaplex object that we use to call `fetch` and `create` on.
+`publicKey?: PublicKey | null` - 
+
+
+```tsx
+export interface NFTContextState {
+  metaplex?: Metaplex | null; // Holds the metaplex object that we use to call `fetch` and `create` on.
+  publicKey?: PublicKey | null; // The public key of the authorized wallet
+  isLoading: boolean; // Loading state
+  loadedNFTs?: (Nft | Sft | SftWithToken | NftWithToken)[] | null; // Array of loaded NFTs that contain metadata
+  nftOfTheDay: (Nft | Sft | SftWithToken | NftWithToken) | null; // The NFT snapshot created on the current day
+  connect: () => void; // Connects (and authorizes) us to the Devnet-enabled wallet
+  fetchNFTs: () => void; // Fetches the NFTs using the `metaplex` object
+  createNFT: (name: string, description: string, fileUri: string) => void; // Creates the NFT
+}
+```
+
+The state flow here is: `connect`, `fetchNFTs` and then `createNFT`.
+
+1. `connect` - this will connect and authorize the app, and then store the resulting `publicKey` into the state.
+2. `fetchNFTs` - will fetch the NFTs using the following snippet:
+  ```tsx
+  metaplex.nfts().findAllByCreator({
+    creator: account.publicKey,
+  });
+  ```
+3. `createNFT` - will upload a file to NFT.Storage, and then use Metaplex to create and mint an NFT to your wallet.
+
+Change `NFTProvider.tsx` to the following:
 ```tsx
 import "react-native-url-polyfill/auto";
 import React, { ReactNode, createContext, useContext, useState } from "react";
@@ -790,6 +868,7 @@ export const useNFT = (): NFTContextState => useContext(NFTContext);
 
 ### 2. Main Screen
 
+Change `MainScreen.tsx` to the following:
 ```tsx
 import {
   View,
@@ -1661,6 +1740,9 @@ export default useMetaplex;
 
 ### 6. NFT Context
 
+`NFTContext.tsx` 
+
+Change `NFTContext.tsx` to resemble the following:
 ```tsx
 import "react-native-url-polyfill/auto";
 import React, { ReactNode, createContext, useContext, useState } from "react";
@@ -1866,6 +1948,9 @@ export const useNFT = (): NFTContextState => useContext(NFTContext);
 ```
 
 ### 7. Main Screen
+
+
+Change `MainScreen.tsx` to resemble the following:
 ```tsx
 import {
   View,
